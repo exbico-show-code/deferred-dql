@@ -11,6 +11,7 @@ namespace Bank30\Service\Background\DeferredDql;
 use Bank30\Service\Background\DeferredDql\Dto\CachedDeferredDql;
 use Doctrine\Common\Cache\Cache;
 use Psr\Log\LoggerInterface;
+use Bank30\Helper\TypeHelper;
 
 class CachedDeferredDqlProvider
 {
@@ -101,13 +102,13 @@ class CachedDeferredDqlProvider
 
         $cachedCount = $redis->zIncrBy(
             self::CACHED_DEFERRED_DQL_RANGE_KEY,
-            -1 * $cachedDeferredDql->getScore(),
+            -1 * $cachedDeferredDql->getScore(), // делаем декермент со значением, которое было на момент прочтения
             $deferredDql->getTargetCacheKey()
         );
 
         if ($cachedCount < self::MIN_AVAILABLE_RANGE_VALUE) {
             $this->deleteCachedDql($deferredDql);
-            $this->handleNegativeValue($cachedCount, $deferredDql);
+            $this->deleteCachedDqlScore($deferredDql);
         } else {
             // Продлим хранение для оставшихся записей
             $this->cacheDeferredDql($deferredDql);
@@ -146,7 +147,6 @@ class CachedDeferredDqlProvider
     private function loadCachedData(string $cachedKey): ?Dto\DeferredDql
     {
         $cachedDql = $this->cache->fetch(self::PROVISION_CACHE_KEY_PREFIX . $cachedKey);
-
         if ($cachedDql === false) {
             $this->logger->warning('Called not existent key', ['key' => $cachedKey]);
 
@@ -162,9 +162,9 @@ class CachedDeferredDqlProvider
 
     private function checkCachedDqlType($cachedDql): bool
     {
-        if (!is_object($cachedDql) || !($cachedDql instanceof Dto\DeferredDql)) {
+        if (!\is_object($cachedDql) || !($cachedDql instanceof Dto\DeferredDql)) {
             $this->logger->warning('Received undefined dql type', [
-                    'type' => is_object($cachedDql) ? get_class($cachedDql) : gettype($cachedDql),
+                    'type' => TypeHelper::typeToString($cachedDql),
                 ]
             );
 
@@ -188,19 +188,12 @@ class CachedDeferredDqlProvider
         $this->cache->delete(self::PROVISION_CACHE_KEY_PREFIX . $deferredDql->getTargetCacheKey());
     }
 
-    private function handleNegativeValue(float $cachedCount, Dto\DeferredDql $deferredDql): void
+    private function deleteCachedDqlScore(Dto\DeferredDql $deferredDql): void
     {
         /** @var \Redis $redis */
         $redis = $this->cache->getRedis();
 
-        if ($cachedCount < 0) {
-            // Обнулим значение DQL в sorted list
-            $redis->zAdd(self::CACHED_DEFERRED_DQL_RANGE_KEY, 0, $deferredDql->getTargetCacheKey());
-
-            $this->logger->warning('Score range must be positive number.', [
-                'dql'   => $deferredDql->getDql(),
-                'score' => $cachedCount,
-            ]);
-        }
+        // Удалим  DQL в sorted list
+        $redis->zRem(self::CACHED_DEFERRED_DQL_RANGE_KEY, $deferredDql->getTargetCacheKey());
     }
 }

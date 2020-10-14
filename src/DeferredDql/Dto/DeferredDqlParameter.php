@@ -43,6 +43,6 @@ class DeferredDqlParameter
 
     public function __toString(): string
     {
-        return sprintf('Name: %s, Value: %s', $this->name, $this->value);
+        return sprintf('Name: %s, Value: %s', $this->name, var_export($this->value, true));
     }
 }

@@ -15,8 +15,13 @@ use Bank30\Service\Background\DeferredDql\DeferredDqlExecutor;
 use Bank30\Service\Background\DeferredDql\Enum\DqlExecuteStatus;
 use Codeception\Test\Unit;
 use Bank30\Service\Background\DeferredDql\Dto;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query\Parameter;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @group deferred-dql
+ */
 class CachedDeferredDqlExecutorTest extends Unit
 {
     use UnitTestCaseTrait;
@@ -100,18 +105,14 @@ class CachedDeferredDqlExecutorTest extends Unit
         $cachedDeferredDqls   = [
             new Dto\CachedDeferredDql(Dto\DeferredDql::create(
                 '__SELECT_1__',
-                [
-                    ['name' => '__NAME__', 'value' => '__VALUE__']
-                ],
+                new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                 ['hint1' => '__VALUE_1__'],
                 '__CACHE_KEY_1__',
                 86400
             ), 30),
             new Dto\CachedDeferredDql(Dto\DeferredDql::create(
                 '__SELECT_2__',
-                [
-                    ['name' => '__NAME__', 'value' => '__VALUE__']
-                ],
+                new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                 ['hint1' => '__VALUE_1__'],
                 '__CACHE_KEY_2__',
                 86400

@@ -12,8 +12,11 @@ use Bank30\Service\Background\DeferredDql\CachedDeferredDqlProvider;
 use Bank30\Service\Background\DeferredDql\Dto;
 use Bank30\Tests\_support\FunctionalTester;
 use Codeception\Example;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query\Parameter;
 
 /**
+ * @group deferred-dql
  * @noinspection PhpUnused
  */
 
@@ -49,17 +52,17 @@ class CachedDqlProviderCest
         $cachedProvider->deleteCachedWithDowngrade($data['dql']);
 
         $cachedRange = $this->redis->zRevRange($rangeKey, 0, -1, true);
-        $I->assertEquals($data['expectedRangeValue'], $cachedRange[$dqlKey], 'Проверим корректное уменьшение рейтинга.');
+        $I->assertEquals($data['expectedRangeValue'], $cachedRange[$dqlKey] ?? null, 'Проверим корректное уменьшение рейтинга.');
     }
 
     protected function dataProviderNegativeCached(): \Generator
     {
         $toDecrementScore = 50;
         // Убавляем на значение больше закешированного
-        yield ['dql' => $this->createCachedDqlWithScore($toDecrementScore), 'startCachedScore' => 10, 'expectedRangeValue' => 0,];
+        yield ['dql' => $this->createCachedDqlWithScore($toDecrementScore), 'startCachedScore' => 10, 'expectedRangeValue' => null,];
 
         // Убавляем на значение равное закешированному
-        yield ['dql' => $this->createCachedDqlWithScore($toDecrementScore), 'startCachedScore' => 50, 'expectedRangeValue' => 0,];
+        yield ['dql' => $this->createCachedDqlWithScore($toDecrementScore), 'startCachedScore' => 50, 'expectedRangeValue' => null,];
 
         // Убавляем на значение меньше закешированного
         yield ['dql' => $this->createCachedDqlWithScore($toDecrementScore), 'startCachedScore' => 70, 'expectedRangeValue' => 20,];
@@ -70,9 +73,7 @@ class CachedDqlProviderCest
         return new Dto\CachedDeferredDql(
             Dto\DeferredDql::create(
                 '__SELECT__',
-                [
-                    ['name' => '__NAME__', 'value' => '__VALUE__'],
-                ],
+                new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                 ['hint' => '__VALUE__'],
                 '__CACHE_KEY__',
                 200

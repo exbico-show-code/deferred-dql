@@ -8,23 +8,30 @@
 
 namespace Bank30\Tests\functional\Service\Background\DeferredDql;
 
+use Bank30\DocumentBundle\Entity\Document;
+use Bank30\DocumentBundle\Entity\DocumentConfig;
+use Bank30\DocumentBundle\Entity\DocumentConstructor;
+use Bank30\DocumentBundle\Entity\DocumentVerification;
+use Bank30\DocumentBundle\Entity\Fields\ConstructorFields;
+use Bank30\DocumentBundle\Entity\Meta\MetadataDocumentScansBag;
+use Bank30\InstanceBundle\Entity\Instance;
+use Bank30\JobBundle\Entity\JobParams;
+use Bank30\Service\Background\DeferredDql\CachedDeferredDqlExecutor;
 use Bank30\Tests\_support\FunctionalTester;
 use Bank30\Tests\functional\DependenciesTrait;
-use Bank30\VerificationBundle\Entity\Document\PassportFields;
+use Bank30\UserBundle\Entity\User;
 use Bank30\VerificationBundle\Entity\ExternalId;
-use Bank30\VerificationBundle\Entity\Instance;
-use Bank30\VerificationBundle\Entity\JobParams;
-use Bank30\VerificationBundle\Entity\Meta\MetadataDocumentScansBag;
-use Bank30\VerificationBundle\Entity\Passport;
-use Bank30\Service\Background\DeferredDql\CachedDeferredDqlExecutor;
 use Bank30\VerificationBundle\Service\Background\Handler\BackgroundDqlCacheHandler;
 use Bank30\VerificationBundle\Service\Cache\LazyRedis;
 use Bank30\VerificationBundle\Service\Cache\LazyRedisCache;
 use Bank30\VerificationBundle\Service\Document\Dto\NullProcessingFlags;
 use Codeception\Example;
 use Doctrine\Common\Cache\Cache;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query\Parameter;
 
 /**
+ * @group deferred-dql
  * @noinspection PhpUnused
  */
 
@@ -34,11 +41,18 @@ class CachedDqlExecuteCest
 
     /** @var Cache */
     protected $cache;
+    /** @var User */
+    private $user;
 
     public function _beforeExtend(FunctionalTester $I): void
     {
         /** @var LazyRedisCache|LazyRedis $cache */
         $this->cache = $I->grabService('b3.cache');
+        $this->cache->flushAll();
+    }
+
+    public function _after(FunctionalTester $I): void
+    {
         $this->cache->flushAll();
     }
 
@@ -54,7 +68,7 @@ class CachedDqlExecuteCest
     {
         $cacheDqlRangeKey = 'easyadmin_deferred_queries';
 
-        $this->loadDocuments($data['documents']);
+        $this->loadEntities($data['entities']);
 
         /** @var BackgroundDqlCacheHandler $dqlHandler */
         $dqlHandler = $I->grabService('b3.background.dql_cache_handler');
@@ -70,24 +84,20 @@ class CachedDqlExecuteCest
         $cachedDql = $this->cache->fetch('provision_' . $data['dql']['targetCacheKey']);
         $I->assertFalse($cachedDql, 'Проверим, что DQL в кеше нет');
 
-        $expectedDqlRange = [0 => $data['dql']['targetCacheKey']];
         $cachedDqlRange   = $this->cache->getRedis()->zRange($cacheDqlRangeKey, 0, -1);
-        $I->assertEquals($expectedDqlRange, $cachedDqlRange, 'Рейтинг DQL равен 0');
+        $I->assertEquals([], $cachedDqlRange, 'DQL удален из рейтинга, потому сет с рейтингом пустой');
     }
 
     protected function dataProviderExecute(): array
     {
         return [
-            'Результат найден и закеширован'                                => [
+            // ==============================================
+            'Результат найден и закеширован' => [
                 'dql'                  => [
-                    'dql'            => 'SELECT count(entity) FROM Bank30\\VerificationBundle\\Entity\\Document entity WHERE entity.createdAt >= :midnight',
-                    'params'         => [
-                        [
-                            'name'  => 'midnight',
-                            'value' => date('Y-m-d'),
-                            'type'  => 2,
-                        ],
-                    ],
+                    'dql'            => 'SELECT count(entity) FROM Bank30\\DocumentBundle\\Entity\\Document entity WHERE entity.createdAt >= :midnight',
+                    'params'         => @serialize(new ArrayCollection([
+                        new Parameter('midnight', date('Y-m-d'), 2),
+                    ])),
                     'hints'          => [
                         'doctrine_paginator.distinct' => false,
                         'doctrine.customOutputWalker' => 'Bank30\\VerificationBundle\\Query\\WithoutDiscriminatorWalker',
@@ -95,34 +105,42 @@ class CachedDqlExecuteCest
                     'targetCacheKey' => 'easyadmin_old_2019-12-17_SELECT count(d0_.id) AS sclr_0 FROM documents d0_d41d8cd98f00b204e9800998ecf8427e',
                     'ttl'            => 6400,
                 ],
-                'documents'            => [
-                    Passport::create(
-                        new ExternalId(1, '1', new Instance('a', 'b')),
-                        1,
-                        new JobParams(2, 0),
-                        new MetadataDocumentScansBag(new PassportFields()),
-                        new NullProcessingFlags()
-                    ),
-                    Passport::create(
-                        new ExternalId(2, '1', new Instance('a', 'a')),
-                        2,
-                        new JobParams(2, 0),
-                        new MetadataDocumentScansBag(new PassportFields()),
-                        new NullProcessingFlags()
-                    ),
+                'entities'             => [
+                    $this->createDocumentConstructor(),
+                    $this->createDocumentConstructor(),
                 ],
                 'expectedCountToCache' => [[1 => 2]],
             ],
-            'Результат: 0, закеширован'                                     => [
+
+            // ==============================================
+
+            'Именнованный запрос с объектом в качестве параметра'    => [
                 'dql'                  => [
-                    'dql'            => 'SELECT count(entity) FROM Bank30\\VerificationBundle\\Entity\\Document entity WHERE entity.createdAt >= :midnight',
-                    'params'         => [
-                        [
-                            'name'  => 'midnight',
-                            'value' => date('Y-m-d'),
-                            'type'  => 2,
-                        ],
+                    'dql'            => 'SELECT count(entity) FROM Bank30\\DocumentBundle\\Entity\\DocumentVerification entity  WHERE entity.verifier = :user',
+                    'params'         => @serialize(new ArrayCollection([
+                        new Parameter('user', $this->createUser(), 2),
+                    ])),
+                    'hints'          => [
+                        'doctrine_paginator.distinct' => false,
+                        'doctrine.customOutputWalker' => 'Bank30\\VerificationBundle\\Query\\WithoutDiscriminatorWalker',
                     ],
+                    'targetCacheKey' => 'maks_123',
+                    'ttl'            => 6400,
+                ],
+                'entities'             => [
+                    $this->createDocumentVerification(),
+                    $this->createDocumentVerification(),
+                ],
+                'expectedCountToCache' => [[1 => 2]],
+            ],
+
+            // ==============================================
+            'Результат: 0, закеширован'                              => [
+                'dql'                  => [
+                    'dql'            => 'SELECT count(entity) FROM Bank30\\DocumentBundle\\Entity\\Document entity WHERE entity.createdAt >= :midnight',
+                    'params'         => @serialize(new ArrayCollection([
+                        new Parameter('midnight', date('Y-m-d'), 2),
+                    ])),
                     'hints'          => [
                         'doctrine_paginator.distinct' => false,
                         'doctrine.customOutputWalker' => 'Bank30\\VerificationBundle\\Query\\WithoutDiscriminatorWalker',
@@ -130,29 +148,85 @@ class CachedDqlExecuteCest
                     'targetCacheKey' => 'easyadmin_old_2019-12-17_SELECT count(d0_.id) AS sclr_0 FROM documents d0_d41d8cd98f00b204e9800998ecf8427e',
                     'ttl'            => 6400,
                 ],
-                'documents'            => [],
+                'entities'             => [],
                 'expectedCountToCache' => [[1 => 0]],
             ],
+
+            // ==============================================
             'Результат: null (из-за любого исключения), закеширован' => [
                 'dql'                  => [
                     'dql'            => 'SELECT pg_sleep(100)',
-                    'params'         => [],
+                    'params'         => @serialize(new ArrayCollection([])),
                     'hints'          => [],
                     'targetCacheKey' => 'any_key',
                     'ttl'            => 6400,
                 ],
-                'documents'            => [],
+                'entities'             => [],
                 'expectedCountToCache' => null,
             ],
         ];
     }
 
-    private function loadDocuments($documents): void
+    private function loadEntities($entities): void
     {
-        foreach ($documents as $document) {
-            $document->clearHash();
-            $this->em->persist($document);
+        foreach ($entities as $entity) {
+            if (method_exists($entity, 'getDocument')) {
+                $this->em->persist($entity->getDocument());
+            }
+
+            if (method_exists($entity, 'getVerifier')) {
+                $this->em->persist($entity->getVerifier());
+            }
+
+            $this->em->persist($entity);
         }
+
         $this->em->flush();
+    }
+
+    private function createDocumentConstructor(): Document
+    {
+        static $instance = null;
+        if ($instance === null) {
+            $instance = new Instance('a', 'b');
+        }
+
+        $doc = DocumentConstructor::create(
+            new ExternalId(1, '1', $instance),
+            1,
+            new JobParams(2, 0),
+            new MetadataDocumentScansBag(new ConstructorFields([], new DocumentConfig('first', '123', [], []))),
+            new NullProcessingFlags()
+        );
+        $doc->clearHash();
+
+        return $doc;
+    }
+
+    private function createDocumentVerification(): DocumentVerification
+    {
+        $doc = $this->createDocumentConstructor();
+
+        $documentVerification = new DocumentVerification(
+            $doc,
+            $this->createUser(),
+            false,
+            20,
+            new ConstructorFields([], new DocumentConfig('first', '123', [], [])),
+            [],
+            DocumentVerification::STATUS_UNDEFINED
+        );
+
+        return $documentVerification;
+    }
+
+    private function createUser(): User
+    {
+        static $user = null;
+        if ($user === null) {
+            $user = new User(555);
+        }
+
+        return $user;
     }
 }

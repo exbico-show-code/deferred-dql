@@ -41,6 +41,9 @@ class DeferredDqlExecutor
 
     public function executeDeferredDql(Dto\DeferredDql $deferredDql, int $timeoutLimit, int $score = 0, bool $forceMode = false): Dto\DeferredDqlExecuteResultRow
     {
+        // Пропускаем, если:
+        //  - есть результат
+        //  - или не соблюдается условие "сохранен NULL, но принудительный рехжим"
         if ($this->isSkipExecution($deferredDql, $forceMode)) {
             return new Dto\DeferredDqlExecuteResultRow(
                 $deferredDql->getDql(),
@@ -85,6 +88,7 @@ class DeferredDqlExecutor
         }
 
         // Если сохранен NULL, но форс-режим, то не пропускаем выполнение и выполняем
+        // форс-режим — это значит мы игнорируем NULL, тк он мог туда записаться без реального выполнения запроса
         if ($cachedResult === null && $forceMode) {
             $this->logger->info('Updating the query result with cached NULL value.');
 
@@ -113,8 +117,8 @@ class DeferredDqlExecutor
             $data = $query->execute();
         } catch (\Throwable $e) {
             $this->logger->warning('Failed query execute.', [
-                'dql'       => $deferredDql->getDql(),
-                'params'    => $deferredDql->getStringParameters(),
+                'dql'       => $query->getDql(),
+                'params'    => var_export($query->getParameters(), true),
                 'exception' => $e,
             ]);
         } finally {

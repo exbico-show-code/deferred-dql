@@ -8,6 +8,9 @@
 
 namespace Bank30\Service\Background\DeferredDql\Dto;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query\Parameter;
+
 class DeferredDql
 {
     /** @var string */
@@ -28,7 +31,7 @@ class DeferredDql
     private function __construct(
         string $cacheKey,
         string $dql,
-        array $parameters = [],
+        array $parameters,
         array $hints = [],
         int $cacheTTL = 0
     ) {
@@ -39,15 +42,15 @@ class DeferredDql
         $this->parameters     = $parameters;
     }
 
-    public static function create(string $dql, array $params, array $hints, string $cacheKey, int $cacheTTL = 0): self
+    public static function create(string $dql, ArrayCollection $inputParams, array $hints, string $cacheKey, int $cacheTTL = 0): self
     {
-        $params = array_map(static function ($param): DeferredDqlParameter {
+        $params  = array_map(static function (Parameter $param): DeferredDqlParameter {
             return new DeferredDqlParameter(
-                $param['name'],
-                $param['value'],
-                $param['type'] ?? null
+                $param->getName(),
+                $param->getValue(),
+                $param->getType()
             );
-        }, $params);
+        }, $inputParams->toArray());
 
         return new self(
             $cacheKey,

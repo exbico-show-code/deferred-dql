@@ -28,7 +28,7 @@ class DeferredDqlTransformer
         foreach ($deferredDql->getParameters() as $parameter) {
             $query->setParameter(
                 $parameter->getName(),
-                $parameter->getValue(),
+                \is_object($parameter->getValue()) ? $parameter->getValue()->getId() : $parameter->getValue(),
                 $parameter->getType()
             );
         }

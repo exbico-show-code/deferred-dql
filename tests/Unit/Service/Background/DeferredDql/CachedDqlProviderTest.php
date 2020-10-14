@@ -13,9 +13,14 @@ use Bank30\Service\Background\DeferredDql\Dto;
 use Bank30\VerificationBundle\Service\Cache\LazyRedis;
 use Codeception\Test\Unit;
 use Doctrine\Common\Cache\Cache;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query\Parameter;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @group deferred-dql
+ */
 class CachedDqlProviderTest extends Unit
 {
     /** @var MockObject|LazyRedis */
@@ -56,9 +61,7 @@ class CachedDqlProviderTest extends Unit
         $dqlCacheKey = 'provision___CACHE_KEY__';
         $deferredDql = Dto\DeferredDql::create(
             '__SELECT__',
-            [
-                ['name' => '__NAME__', 'value' => '__VALUE__'],
-            ],
+            new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
             ['hint1' => '__VALUE_1__'],
             $cacheKey,
             200
@@ -137,28 +140,24 @@ class CachedDqlProviderTest extends Unit
                 'loadedObjects'    => [
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => '__NAME__', 'value' => '__VALUE__'],
-                        ],
+                        new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY__',
                         200
                     ),
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => '__NAME__', 'value' => '__VALUE__'],
-                        ],
+                        new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY_2__',
                         200
                     ),
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => 'bool_name', 'value' => true],
-                            ['name' => 'int_name', 'value' => 33],
-                        ],
+                        new ArrayCollection([
+                            new Parameter('bool_name', true),
+                            new Parameter('int_name', 33),
+                        ]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY_3__',
                         200
@@ -179,9 +178,7 @@ class CachedDqlProviderTest extends Unit
                 'loadedObjects'    => [
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => '__NAME__', 'value' => '__VALUE__'],
-                        ],
+                        new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY__',
                         200
@@ -235,18 +232,14 @@ class CachedDqlProviderTest extends Unit
                 'loadedObjects'    => [
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => '__NAME__', 'value' => '__VALUE__'],
-                        ],
+                        new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY__',
                         200
                     ),
                     Dto\DeferredDql::create(
                         '__SELECT__',
-                        [
-                            ['name' => '__NAME__', 'value' => '__VALUE__'],
-                        ],
+                        new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                         ['hint' => '__VALUE__'],
                         '__CACHE_KEY_2__',
                         200

@@ -23,9 +23,6 @@ class CachedDeferredDqlExecutor
     /** @var LoggerInterface */
     private $logger;
 
-    /** @var int */
-    private $defaultTimeout;
-
     public function __construct(
         DeferredDqlExecutor $deferredDqlExecutor,
         CachedDeferredDqlProvider $cachedDqlProvider,
@@ -35,14 +32,13 @@ class CachedDeferredDqlExecutor
         $this->deferredDqlExecutor = $deferredDqlExecutor;
         $this->cachedDqlProvider   = $cachedDqlProvider;
         $this->logger              = $logger;
-        $this->defaultTimeout      = $defaultTimeout;
     }
 
     public function executeCached(): Dto\CachedDqlExecuteResult
     {
         $done = $failed = $skipped = 0;
         foreach ($this->cachedDqlProvider->findAll() as $cachedDeferredDql) {
-            $result = $this->deferredDqlExecutor->executeDeferredDql(
+            $result      = $this->deferredDqlExecutor->executeDeferredDql(
                 $cachedDeferredDql->getDeferredDql(),
                 $this->getTimeout($cachedDeferredDql),
                 $cachedDeferredDql->getScore(),

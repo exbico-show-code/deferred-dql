@@ -17,11 +17,16 @@ use Bank30\Service\Background\DeferredDql\DeferredDqlTransformer;
 use Bank30\Service\Background\DeferredDql\Dto;
 use Bank30\Service\Background\DeferredDql\Enum\DqlExecuteStatus;
 use Codeception\Test\Unit;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Driver\Connection;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\Query\Parameter;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @group deferred-dql
+ */
 class DeferredDqlExecutorTest extends Unit
 {
     use UnitTestCaseTrait, UopzTrait;
@@ -94,6 +99,7 @@ class DeferredDqlExecutorTest extends Unit
             ->with($dql)
             ->willReturn($query)
         ;
+
         $result = $this->deferredExecutor->executeDeferredDql($dql, 30, 0, $forceMode);
 
         $this->assertEquals($expectedResult, $result);
@@ -105,9 +111,7 @@ class DeferredDqlExecutorTest extends Unit
             'Нет значения в кеше, успешно выполнено'                               => [
                 'dql'                       => Dto\DeferredDql::create(
                     '__SELECT__',
-                    [
-                        ['name' => '__NAME__', 'value' => '__VALUE__'],
-                    ],
+                    new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                     ['hint1' => '__VALUE_1__'],
                     '__CACHE_KEY_1__',
                     86400
@@ -124,9 +128,7 @@ class DeferredDqlExecutorTest extends Unit
             'Есть закешированное значение (не NULL), пропускаем выполнение'        => [
                 'dql'                       => Dto\DeferredDql::create(
                     '__SELECT__',
-                    [
-                        ['name' => '__NAME__', 'value' => '__VALUE__'],
-                    ],
+                    new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                     ['hint1' => '__VALUE_1__'],
                     '__CACHE_KEY_1__',
                     86400
@@ -143,9 +145,7 @@ class DeferredDqlExecutorTest extends Unit
             'Есть закешированное значение (NULL), force режим, успешно выполнено'  => [
                 'dql'                       => Dto\DeferredDql::create(
                     '__SELECT__',
-                    [
-                        ['name' => '__NAME__', 'value' => '__VALUE__'],
-                    ],
+                    new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                     ['hint1' => '__VALUE_1__'],
                     '__CACHE_KEY_1__',
                     86400
@@ -162,9 +162,7 @@ class DeferredDqlExecutorTest extends Unit
             'Есть закешированное значение (NULL), НЕ force, пропускаем выполнение' => [
                 'dql'                       => Dto\DeferredDql::create(
                     '__SELECT__',
-                    [
-                        ['name' => '__NAME__', 'value' => '__VALUE__'],
-                    ],
+                    new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                     ['hint1' => '__VALUE_1__'],
                     '__CACHE_KEY_1__',
                     86400
@@ -181,9 +179,7 @@ class DeferredDqlExecutorTest extends Unit
             'Не выполнено по разным причинам'                                      => [
                 'dql'                       => Dto\DeferredDql::create(
                     '__SELECT__',
-                    [
-                        ['name' => '__NAME__', 'value' => '__VALUE__'],
-                    ],
+                    new ArrayCollection([new Parameter('__NAME__', '__VALUE__')]),
                     ['hint1' => '__VALUE_1__'],
                     '__CACHE_KEY_1__',
                     86400
